@@ -1,0 +1,14 @@
+base-devel
+btrfs-progs
+efibootmgr
+git
+grub
+mtools
+networkmanager
+openssh
+os-prober
+osfstools
+reflector
+rsync
+sudo
+vim

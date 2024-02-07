@@ -1,0 +1,8 @@
+alacritty
+filezilla
+kitty
+mpv
+neofetch
+qbittorrent
+vlc
+yt-dlp

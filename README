@@ -1,0 +1,578 @@
+# Arch Linux Install
+
+Boot into the Live ISO. Verify that Internet connection exists. Use an Ethernet connection so that this is automatically established by the Live ISO.
+
+```sh
+$ ip addr show
+$ ping archlinux.org
+```
+
+If Internet connection is not available via Ethernet, you can set up a connection using a Wi-Fi device.
+
+```sh
+$ iwctl
+
+# `iwctl` will display a new prompt
+[iwd] device list
+[iwd] station <device> connect <network>
+[iwd] exit
+```
+
+It may be more convenient to do setup remotely from an already functional computer. We can accomplish that using SSH. The `sshd` service daemon is probably already enabled. We can verify that by trying to start it.
+
+```sh
+$ systemctl start sshd
+```
+
+To use SSH, we'll need to set a password on the root superuser.
+
+```sh
+$ passwd  # Will assume you mean root if you don't specify a user
+```
+
+We can use SSH on our other computer to connect to our target system.
+
+```sh
+$ ssh root@<ip address>  # Get the IP address from `ip addr show`
+```
+
+To make things a little faster, we can update our `pacman` mirrorlist to use better mirrors.
+
+```sh
+$ reflector --country US --latest 5 --sort rate --save /etc/pacman.d/mirrorlist
+```
+
+We can make things faster still by enabling parallel downloads for `pacman`.
+
+```sh
+$ vim /etc/pacman.conf
+
+# Uncomment ParallelDownloads and give it a value > 1
+# Optionally, uncomment the Color line for nice colors
+```
+
+We can synchronize our Live ISO's `pacman` package database.
+
+```sh
+$ pacman -Syy
+```
+
+We can check the NTP status.
+
+```sh
+$ timedatectl status
+```
+
+## Disks
+
+Identify disk(s) available to the system.
+
+```sh
+$ lsblk
+```
+
+### Partition the Disks
+
+Set up partitions on a disk. Use whatever disk formatting utility you want. Make sure to use the full disk, not a single partition.
+
+```sh
+$ cfdisk /dev/disk # Use the actual disk, not a partition!
+$ cfdisk /dev/sda  # For example, using the /sda device
+```
+
+Set up whatever partitions you want. You'll probably want at least an EFI partition and a boot partition. Unless you have good reason no to, set up your disk partitions with a GPT partition table.
+
+```sh
+# For example
+Partition   Size    Type
+----------  ------- -----------------
+/dev/sda1   1G      EFI System
+/dev/sda2   4G      BIOS Boot
+/dev/sda3   <rest>  Linux Filesystem  # Set to Linux LVM if you're using LVM
+```
+
+When you're happy with your disk layout, write the changes to disk.
+
+Repeat the partitioning process for however many disks you have.
+
+### Format the Partitions
+
+We need to format the EFI partition as `FAT32`.
+
+```sh
+$ mkfs.vfat -F32 /dev/sda1
+```
+
+We can format the BIOS Boot partition as `ext4`.
+
+```sh
+$ mkfs.ext4 /dev/sda2
+```
+
+We'll format the remaining partition as `btrfs`. You can format it as `ext4` or whatever else you prefer. If you're setting up LVM, be sure to configure LVM before formatting the partition.
+
+```sh
+$ mkfs.btrfs /dev/sda3
+```
+
+### BTRFS Subvolumes
+
+To set up our btrfs subvolumes, we need to first mount our btrfs filesystem partition.
+
+```sh
+$ mount /dev/sda3 /mnt
+```
+
+We can now create some btrfs subvolumes.
+
+```sh
+$ cd /mnt
+$ btrfs subv create @           # /
+$ btrfs subv create @cache      # /var/cache
+$ btrfs subv create @home       # /home (if not on another disk)
+$ btrfs subv create @images     # /var/lib/libvirt/images
+$ btrfs subv create @var_log    # /var/log 
+$ btrfs subv create @snapshots  # /.snapshots
+$ umount /mnt
+```
+
+Now that we have our subvolumes created, we can remount with the options that btrfs will expect.
+
+```sh
+# In this first example, @ is the subvolume we want to use
+# The @ subvolume is located on the /dev/sda3 filesystem
+# We want to mount it to /mnt, which will be / on the target system
+$ mount -o compress=zstd,noatime,subvol=@ /dev/sda3 /mnt
+
+# Create the subdirectories for our other subvolumes
+$ mkdir -p /mnt/{boot/efi,home,.snapshots,var/{cache,log,lib/libvirt/images}}
+
+# Mount the rest of our subvolumes
+$ mount -o compress=zstd,noatime,subvol=@cache     /dev/sda3 /mnt/var/cache
+$ mount -o compress=zstd,noatime,subvol=@home      /dev/sda3 /mnt/home
+$ mount -o compress=zstd,noatime,subvol=@images    /dev/sda3 /mnt/lib/libvirt/images
+$ mount -o compress=zstd,noatime,subvol=@var_log   /dev/sda3 /mnt/var/log
+$ mount -o compress=zstd,noatime,subvol=@snapshots /dev/sda3 /mnt/.snapshots
+```
+
+We can mount our EFI partition.
+
+```sh
+$ mount /dev/sda1 /mnt/boot/efi
+```
+
+## Pacstrap
+
+We'll use `pacstrap` to install the initial packages onto the target system.
+
+```sh
+$ pacstrap -K /mnt base base-devel git vim reflector openssh
+```
+
+## Fstab
+
+We'll set up the `fstab` using `genfstab`. The `-U` option ensures that our `/etc/fstab` file on the target system will use UUIDs to refer to devices and partitions. The `-p` option is technically redundant.
+
+Make sure you're appending to the `fstab` file on the target system (i.e., `/mnt/etc/sfstab`).
+
+```sh
+$ genfstab -U -p /mnt >> /mnt/etc/fstab
+```
+
+## Chroot into Target System
+
+Now we can `chroot` into the in-progress installation on the target system.
+
+```sh
+$ arch-chroot /mnt
+```
+
+Verify that the `fstab` generated correctly.
+
+```sh
+$ vim /etc/fstab
+```
+
+Before we install any packages using `pacman`, we can make the same tweaks we did in the Live ISO environment.
+
+```sh
+$ reflector --country US --latest 5 --sort rate --save /etc/pacman.d/mirrorlist
+$ pacman -Syy
+```
+
+```sh
+$ vim /etc/pacman.conf
+
+# Enable ParallelDownloads and set a value > 1
+# Optionally enable Color
+
+$ pacman -Syy
+```
+
+Now that we're on the target system, we can use `pacman` to install our preferred initial packages.
+
+```sh
+$ mkdir GitPackageLists
+$ cd GitPackageLists
+$ git clone <repository>/ArchLinux
+$ cd ArchLinux
+
+# Install from our package lists
+$ pacman -S --needed - < 01-base.txt
+$ pacman -S --needed - < 02-kernel.txt
+$ pacman -S --needed - < 03-sysutils.txt
+$ pacman -S --needed - < 04-drivers.txt
+$ pacman -S --needed - < 05-network.txt
+$ pacman -S --needed - < 06-fonts.txt
+$ pacman -S --needed - < 07-printer.txt
+$ pacman -S --needed - < 08-multimedia.txt
+$ pacman -S --needed - < 09-xorg.txt
+$ pacman -S --needed - < 10-xfce.txt  # Note that Xfce4 is GTK
+$ pacman -S --needed - < 11-misc.txt  
+```
+
+Now we can set a password for the `root` superuser.
+
+```sh
+$ passwd
+```
+
+Now we can create a user for ourselves and give them a password.
+
+```sh
+$ useradd -m -G sys,log,network,floppy,scanner,power,rfkill,users,video,audio,storage,optical,lp,wheel,adm -s /bin/zsh <name>
+$ passwd <name>
+$ id <name>  # Inspect a user
+```
+
+We need to allow our user to execute commands via `sudo`. We can do this by editing the `sudoers` file.
+
+```sh
+$ EDITOR=vim visudo  # Uncomment the `%wheel ALL=(ALL:ALL) ALL` line
+```
+
+If you've installed `openssh`, you can enable the service daemon now.
+
+```sh
+$ systemctl enable sshd
+```
+<!-- 
+### Install Linux Kernels
+
+We can use `pacman` to install whichever `linux` kernels we desire.
+
+```sh
+$ pacman -S linux linux-headers
+```
+
+Optionally, we can install the LTS version of the kernel. (Recommended)
+
+```sh
+$ pacman -S linux-lts linux-lts-headers
+```
+
+Optionally, we can install some basic firmware. There's no reason not to install this package.
+
+```sh
+$ pacman -S linux-firmware
+``` -->
+<!-- 
+### Video Drivers
+
+Now we can install drivers whichever graphics device(s) we are using. We can identify the type of graphics device(s) we have by using `lspci` (listing all PCI devices).
+
+```sh
+$ lspci | grep -i vga
+```
+
+For Intel and AMD graphics devices, we can use open-source drivers.
+
+```sh
+$ pacman -S --needed mesa
+```
+
+We can enable hardware decoding for our graphics device(s). 
+
+For Intel devices:
+
+```sh
+$ pacman -S --needed intel-media-driver
+```
+
+For AMD devices:
+
+```sh
+$ pacman -S --needed libva-mesa-driver
+``` -->
+
+### GRUB
+
+We can modify our GRUB default config. This is especially necessary if you're using an encrypted filesystem and/or LVM. You may also want to specify the root filesystem's path.
+
+```sh
+$ vim /etc/default/grub
+```
+
+Look for `GRUB_CMDLINE_LINUX_DEFAULT` and `GRUB_CMDLINE_LINUX` near the top of the file.
+
+We need to create a place for our EFI partition to mount, if it doesn't already exist. Mount to that point, if not already mounted.
+
+```sh
+$ mkdir /boot/efi
+$ mount /dev/sda1 /boot/efi  # Use the correct device and partition
+```
+
+We can install the GRUB bootloader.
+
+```sh
+$ grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=grub_uefi --recheck
+```
+
+```sh
+$ cp /usr/share/locale/en\@quot\LC_MESSAGES/grub.mo /boot/grub/locale/en.mo
+$ grub-mkconfig -o /boot/grub/grub.cfg
+$ grub-mkconfig -o /boot/efi/EFI/arch/grub.cfg
+```
+
+### `mkinitcpio`
+
+We can necessary values to our `mkinitcpio` config.
+
+```sh
+$ vim /etc/mkinitcpio.conf
+```
+
+We're using `btrfs`, so we can add `btrfs` to the `MODULES` and `BINARIES` collections.
+
+If you're using LVM, add `lvm2` to the `HOOKS`. Also make sure you `pacman -S lvm2`.
+
+Once we're finished updating `mkinitcpio.conf`, we need to rebuild our kernel images.
+
+```sh
+$ mkinitcpio -p linux
+$ mkinitcpio -p linux-lts  # Only if you installed the LTS kernel
+```
+
+### Time and Locale
+
+```sh
+$ ln -sf /usr/share/zoneinfo/America/Chicago /etc/localtime
+$ vim /etc/systemd/timesyncd.conf  # Set the NTP and FallbackNTP under [Time]
+$ systemctl enable systemd-timesyncd.service
+$ hwclock --systohc --utc
+```
+
+```sh
+$ vim /etc/locale.gen  # Uncomment #en_US.UTF-8
+$ locale-gen
+$ echo "LANG=en_US.UTF-8" > /etc/locale.conf
+```
+
+```sh
+$ echo "<hostname>" > /etc/hostname
+```
+
+```sh
+$ vim /etc/hosts
+
+# Add the following entries to `/etc/hosts`
+# 127.0.0.1     localhost
+# ::1           localhost
+# 127.0.1.1     <hostname>.localdomain  <hostname>
+```
+
+### Enable System Services
+
+We can enable various service daemons that systemd will control.
+
+```sh
+$ systemctl enable sddm.service         # Enable the SDDM greeter
+$ systemctl enable NetworkManager       # Enable Network Manager
+$ systemctl enable avahi-daemon         # Detect devices on network
+$ systemctl enable bluetooth.service    # Bluetooth support
+$ systemctl enable haveged              # RNG for some services
+$ systemctl enable cups.service         # Printing
+$ systemctl enable firewalld.service    # Firewall
+$ systemctl enable fstrim.timer         # Filesystem trim timer
+$ systemctl enable reflector.timer      # `pacman` mirror updates
+$ systemctl enable sshd                 # SSH support
+$ systemctl enable upower               # Probably unnecessary
+```
+
+### Exit Chroot
+
+Once we're finished doing initial setup within the target system, we can `exit` the `chroot`.
+
+```sh
+$ exit
+```
+
+We need to make sure that we unmount all the devices and partitions that we've mounted from inside the Live ISO.
+
+```sh
+$ umount -R /mnt
+$ lsblk     # Verify everything was unmounted
+```
+
+Finally, we can `reboot` to restart the system.
+
+```sh
+$ reboot now
+```
+
+## Post-Install Configuration
+
+Now that we have Arch Linux installed, we can do some configuration on our actual system. 
+
+### `paru` AUR Helper
+
+We'll use the `paru` AUR helper.
+
+```sh
+# Install rust
+$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install `paru`
+$ git clone https://aur.archlinux.org/paru.git
+$ cd paru
+$ makepkg -si
+
+# Make sure `paru` works
+$ paru
+
+# Cleanup
+$ cd
+$ rm -rf /paru
+```
+
+### `snapper` for Snapshots
+
+We'll use `snapper` to manage our btrfs snapshots. We'll also install packages to automatically create pre-post snapshots for `pacman`/`paru` (`snap-pac`), as well as to show snapshots on the GRUB boot menu (`grub-btrfs`).
+
+```sh
+$ paru -S snapper-support
+```
+
+`snapper` will try to create its own snapshots directory at `/.snapshots`, but we already have a subvolume set up there. We can fix that.
+
+```sh
+$ sudo -s   # Become root superuser
+$ cd /      
+$ umount /.snapshots
+$ rm -r /.snapshots
+
+# Create the "root" config with `snapper`, targeting the root filesystem
+$ snapper -c root create-config /
+
+# `snapper` will create a new `.snapshots` subvolume we need to delete
+$ btrfs subv list /
+$ btrfs subv delete /.snapshots
+
+# Re-create the directory and re-mount on it
+$ mkdir /.snapshots
+$ mount -a
+$ lsblk
+```
+
+While we're here, we can set up the default subvolume for our root filesystem (`/`).
+
+```sh
+$ btrfs subv get-default /
+$ btrfs subv list /             # We're looking for the ID for @
+$ btrfs subv set-default <ID> /
+$ btrfs subv get-default /      # Verify
+```
+
+We can allow our user(s) to see and access the `snapper` snapshots directory by editing the appropriate configuration file.
+
+```sh
+$ vim /etc/snapper/config/root      # For the "root" config
+
+# Add the user to `ALLOW_USERS`
+# Add the "wheel" group to `ALLOW_GROUPS`
+# Adjust `TIMELINE` values as desired
+
+# Update permissions for the `/.snapshots` directory
+$ chmod a+rx .snapshots
+$ chown -R :wheel .snapshots
+```
+
+We can create a snapshot of our current system configuration. Remember that snapshots are read-only by default.
+
+```sh
+$ snapper -c root create -d "***** SYSTEM INSTALL *****"
+```
+
+We can verify that the `grub-btrfs` service was enabled and started.
+
+```sh
+$ systemctl status grub-btrfsd
+$ systemctl status grub-btrfs-snapper.service
+```
+
+Exit root whenever you're ready.
+
+### `zram` for RAM-based Swap
+
+We can use `zram` to use our RAM for swap space, instead of using precious read/write cycles on our SSD.
+
+```sh
+$ paru -S zram-generator        # `snap-pac` should do a pre/post snapshot
+
+# Configure `zram-generator`
+$ sudo vim /etc/systemd/zram-generator.conf
+```
+
+We can configure `zram-generator` like so:
+
+```ini
+[zram0]
+zram-size = ram / 2
+```
+
+Now we need to reload our system daemons.
+
+```sh
+$ sudo systemctl daemon-reload
+$ sudo systemctl start /dev/zram0
+```
+
+We can check `zram` by using `zramctl`. May require a reboot for `zram` to take effect.
+
+```sh
+$ zramctl
+$ free -h       # Should show swap is active
+```
+
+## Additional Resources
+
+<!--
+https://wiki.archlinux.org/title/Installation_guide
+https://wiki.archlinux.org/title/Official_repositories#multilib
+https://wiki.archlinux.org/title/Users_and_groups#Group_list
+https://wiki.archlinux.org/title/Snapper
+https://wiki.archlinux.org/title/Firewalld
+https://wiki.archlinux.org/title/PipeWire
+https://wiki.archlinux.org/title/AMDGPU#Installation
+https://wiki.archlinux.org/title/Zram#Using_zram-generator
+
+https://archlinux.org/packages/extra/x86_64/inotify-tools/
+
+https://www.youtube.com/watch?v=MB-cMq8QZh4 
+https://www.youtube.com/watch?v=NOCPVxZhMqQ
+https://www.youtube.com/watch?v=FxeriGuJKTM
+https://github.com/stephenstechtalks/ArchLinux/tree/main/Paclists/230131-Xfce
+https://www.reddit.com/r/archlinux/comments/108hzb2/help_needed_with_btrfs_layout/
+
+https://archlinux.org/packages/extra/x86_64/helix/
+https://aur.archlinux.org/packages/btrfs-assistant
+https://github.com/sharkdp/bat?tab=readme-ov-file
+https://github.com/eza-community/eza?tab=readme-ov-file
+https://github.com/muesli/duf
+
+https://github.com/ohmyzsh/ohmyzsh
+https://github.com/romkatv/powerlevel10k?tab=readme-ov-file#oh-my-zsh
+
+https://wiki.hyprland.org/Getting-Started/Master-Tutorial/
+https://wiki.hyprland.org/Useful-Utilities/
+-->
