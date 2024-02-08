@@ -456,7 +456,7 @@ Created symlink /etc/systemd/system/multi-user.target.wants/sshd.service → /us
 Now we can create a user for ourselves and give them a password. This particular list of groups is probably overkill. Consult the Arch Wiki to see what's appropriate for you. In this case, we're specifying that this user will use the `zsh` shell (`-s /bin/zsh`).
 
 ```
-[root@archiso /]# useradd -m -G sys,log,network,floppy,scanner,power,rfkill,users,video,audio,storage,optical,lp,wheel,adm -s /bin/zsh <name>
+[root@archiso /]# useradd -m -G adm,audio,ftp,games,log,lp,network,rfkill,scanner,storage,sys,users,video,wheel -s /bin/zsh <name>
 [root@archiso /]# passwd <name>
 [root@archiso /]# id <name>  # Inspect a user
 ```
@@ -890,10 +890,12 @@ Additional dependencies for [hyprdots](https://github.com/prasanthrangan/hyprdot
 <a href="#additional-resources"></a>
 ## Additional Resources
 
+- [Arch Wiki generic installation guide](https://wiki.archlinux.org/title/Installation_guide)
+- [Arch Wiki page on user groups](https://wiki.archlinux.org/title/Users_and_groups#Group_list)
 - [Arch Wiki page on `snapper`](https://wiki.archlinux.org/title/Snapper)
 - [Arch Wiki page on AMD GPUs](https://wiki.archlinux.org/title/AMDGPU)
 
 <!--
-https://wiki.archlinux.org/title/Installation_guide
+
 https://www.reddit.com/r/archlinux/comments/108hzb2/help_needed_with_btrfs_layout/
 -->
