@@ -891,9 +891,10 @@ Additional dependencies for [hyprdots](https://github.com/prasanthrangan/hyprdot
 ## Additional Resources
 
 - [Arch Wiki generic installation guide](https://wiki.archlinux.org/title/Installation_guide)
+- [Arch Wiki page on BTRFS](https://wiki.archlinux.org/title/Btrfs)
 - [Arch Wiki page on user groups](https://wiki.archlinux.org/title/Users_and_groups#Group_list)
-- [Arch Wiki page on `snapper`](https://wiki.archlinux.org/title/Snapper)
 - [Arch Wiki page on AMD GPUs](https://wiki.archlinux.org/title/AMDGPU)
+- [Arch Wiki page on `snapper`](https://wiki.archlinux.org/title/Snapper)
 
 <!--
 
