@@ -1,261 +1,465 @@
 # Arch Linux Install
 
+This is the process I followed to set up my personal Arch Linux installation. Your mileage may vary. When in doubt, consult the official Arch Wiki and related documentation. 
+
+This process is mostly cobbled together from the [Arch Wiki](https://wiki.archlinux.org/title/Installation_guide), [Stephen's Tech Talks](https://www.youtube.com/@stephenstechtalks5377), [Learn Linux TV](https://www.youtube.com/@LearnLinuxTV), and [Dreams of Autonomy](https://www.youtube.com/@dreamsofautonomy). I owe a debt of gratitude to them all.
+
+# Contents
+
+1. [First Steps](#first-steps)
+2. [Disks](#disks)
+3. [Chroot into Target System](#chroot-into-target-system)
+4. [Post-Install Configuration](#post-install-configuration)
+5. [Additional Resources](#additional-resources)
+
+<a href="#first-steps"></a>
+## First Steps
+
 Boot into the Live ISO. Verify that Internet connection exists. Use an Ethernet connection so that this is automatically established by the Live ISO.
 
-```sh
-$ ip addr show
-$ ping archlinux.org
+```
+root@archiso ~ # ip addr show
+root@archiso ~ # ping archlinux.org
 ```
 
 If Internet connection is not available via Ethernet, you can set up a connection using a Wi-Fi device.
 
-```sh
-$ iwctl
+```
+root@archiso ~ # iwctl
 
-# `iwctl` will display a new prompt
 [iwd] device list
+                                    Devices                                   
+--------------------------------------------------------------------------------
+  Name                  Address               Powered     Adapter     Mode      
+--------------------------------------------------------------------------------
+
 [iwd] station <device> connect <network>
 [iwd] exit
 ```
 
-It may be more convenient to do setup remotely from an already functional computer. We can accomplish that using SSH. The `sshd` service daemon is probably already enabled. We can verify that by trying to start it.
+It may be more convenient to do setup remotely from an already functional computer. We can accomplish that using SSH. The `sshd` service daemon is probably already running. We can verify that by trying to start it.
 
-```sh
-$ systemctl start sshd
+```
+root@archiso ~ # systemctl start sshd
 ```
 
 To use SSH, we'll need to set a password on the root superuser.
 
-```sh
-$ passwd  # Will assume you mean root if you don't specify a user
+```
+root@archiso ~ # passwd 
 ```
 
 We can use SSH on our other computer to connect to our target system.
 
-```sh
-$ ssh root@<ip address>  # Get the IP address from `ip addr show`
+```
+root@archiso ~ # ssh root@<ip address>  
 ```
 
-To make things a little faster, we can update our `pacman` mirrorlist to use better mirrors.
+To make things a little faster, we can update our `pacman` mirrorlist to use better mirrors. Remember that this is updating the mirrorlist on the Live ISO, not the target system.
 
-```sh
-$ reflector --country US --latest 5 --sort rate --save /etc/pacman.d/mirrorlist
+```
+root@archiso ~ # reflector --country US --latest 5 --sort rate --save /etc/pacman.d/mirrorlist
 ```
 
 We can make things faster still by enabling parallel downloads for `pacman`.
 
-```sh
-$ vim /etc/pacman.conf
-
-# Uncomment ParallelDownloads and give it a value > 1
-# Optionally, uncomment the Color line for nice colors
 ```
+root@archiso ~ # vim /etc/pacman.conf
 
-We can synchronize our Live ISO's `pacman` package database.
-
-```sh
-$ pacman -Syy
+# Misc options
+#UseSyslog
+Color
+#NoProgressBar
+CheckSpace
+#VerbosePkgLists
+ParallelDownloads = 10
 ```
 
 We can check the NTP status.
 
-```sh
-$ timedatectl status
+```
+root@archiso ~ # timedatectl status
+               Local time: Wed 2024-02-07 21:34:28 UTC
+           Universal time: Wed 2024-02-07 21:34:28 UTC
+                 RTC time: Wed 2024-02-07 21:34:28
+                Time zone: UTC (UTC, +0000)
+System clock synchronized: yes
+              NTP service: active
+          RTC in local TZ: no
 ```
 
+If NTP is not active, we can activate it.
+
+```
+root@archiso ~ # timedatectl set-ntp true
+```
+
+We can synchronize our Live ISO's `pacman` package database.
+
+```
+root@archiso ~ # pacman -Syy
+:: Synchronizing package databases...
+ core
+ extra
+ community
+```
+
+<a href="#disks"></a>
 ## Disks
 
 Identify disk(s) available to the system.
 
-```sh
-$ lsblk
+```
+root@archiso ~ # lsblk
 ```
 
 ### Partition the Disks
 
-Set up partitions on a disk. Use whatever disk formatting utility you want. Make sure to use the full disk, not a single partition.
+Set up partitions on one or more disks. Use whichever disk formatting utility you want. Make sure to use the full disk, not a single partition.
 
-```sh
-$ cfdisk /dev/disk # Use the actual disk, not a partition!
-$ cfdisk /dev/sda  # For example, using the /sda device
+```
+# Use the actual disk, not a partition!
+root@archiso ~ # cfdisk /dev/disk          
+```
+
+For example, using the /sda device:
+
+```
+root@archiso ~ # cfdisk /dev/sda            
 ```
 
 Set up whatever partitions you want. You'll probably want at least an EFI partition and a boot partition. Unless you have good reason no to, set up your disk partitions with a GPT partition table.
 
+Sample partition layout:
+
 ```sh
-# For example
-Partition   Size    Type
-----------  ------- -----------------
-/dev/sda1   1G      EFI System
-/dev/sda2   4G      BIOS Boot
-/dev/sda3   <rest>  Linux Filesystem  # Set to Linux LVM if you're using LVM
+Device       Start      End  Sectors Size Type
+/dev/sda1     2048  2099199  2097152   1G EFI System      
+/dev/sda2  2099200  4196351  2097152   1G BIOS boot       
+/dev/sda3  4196352 67106815 62910464  30G Linux filesystem        
 ```
 
-When you're happy with your disk layout, write the changes to disk.
+If you're using Linux LVM, set the filesystem type to "Linux LVM" instead of "Linux filesystem".
 
-Repeat the partitioning process for however many disks you have.
+When you're happy with your disk layout, write the changes to disk. Repeat the partitioning process for however many disks you have.
+
+You should now have a partitioned disk. For example, something like this:
+
+```
+root@archiso ~ # lsblk
+NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+loop0    7:0    0 766.5M  1 loop /run/archiso/airootfs
+sda      8:0    0    32G  0 disk
+├─sda1   8:1    0     1G  0 part
+├─sda2   8:2    0     1G  0 part
+└─sda3   8:3    0    30G  0 part
+sr0     11:0    1 932.3M  0 rom  /run/archiso/bootmnt
+```
 
 ### Format the Partitions
 
 We need to format the EFI partition as `FAT32`.
 
-```sh
-$ mkfs.vfat -F32 /dev/sda1
+```
+root@archiso ~ # mkfs.fat -F32 /dev/sda1 
+mkfs.fat 4.2 (2021-01-31)
 ```
 
 We can format the BIOS Boot partition as `ext4`.
 
-```sh
-$ mkfs.ext4 /dev/sda2
+```
+root@archiso ~ # mkfs.ext4 /dev/sda2
+mke2fs 1.47.0 (5-Feb-2023)
+Creating filesystem with 262144 4k blocks and 65536 inodes
+Filesystem UUID: 44c980f8-b956-4410-a59f-16572a2d4b5f    
+Superblock backups stored on blocks:
+        32768, 98304, 163840, 229376
+
+Allocating group tables: done
+Writing inode tables: done
+Creating journal (8192 blocks): done
+Writing superblocks and filesystem accounting information: done
 ```
 
 We'll format the remaining partition as `btrfs`. You can format it as `ext4` or whatever else you prefer. If you're setting up LVM, be sure to configure LVM before formatting the partition.
 
-```sh
-$ mkfs.btrfs /dev/sda3
+```
+root@archiso ~ # mkfs.btrfs /dev/sda3
+btrfs-progs v6.7
+See https://btrfs.readthedocs.io for more information.
+
+NOTE: several default settings have changed in version 5.15, please make sure
+      this does not affect your deployments:        
+      - DUP for metadata (-m dup)
+      - enabled no-holes (-O no-holes)
+      - enabled free-space-tree (-R free-space-tree)
+
+Label:              (null)
+UUID:               2f26556a-ac61-4d4e-ad5f-22b5498589f9
+Node size:          16384
+Sector size:        4096
+Filesystem size:    30.00GiB
+Block group profiles:
+  Data:             single            8.00MiB
+  Metadata:         DUP             256.00MiB
+  System:           DUP               8.00MiB
+SSD detected:       no
+Zoned device:       no
+Incompat features:  extref, skinny-metadata, no-holes, free-space-tree
+Runtime features:   free-space-tree
+Checksum:           crc32c
+Number of devices:  1
+Devices:
+   ID        SIZE  PATH
+    1    30.00GiB  /dev/sda3
+```
+
+You can use `lsblk` to verify the filesystem type under the `FSTYPE` column.
+
+```
+root@archiso ~ # lsblk -f
+NAME   FSTYPE   FSVER            LABEL       UUID                                 
+loop0  squashfs 4.0                                                               
+sda
+├─sda1 vfat     FAT32                        9BD3-8A05
+├─sda2 ext4     1.0                          44c980f8-b956-4410-a59f-16572a2d4b5f
+└─sda3 btrfs                                 2f26556a-ac61-4d4e-ad5f-22b5498589f9
+sr0    iso9660  Joliet Extension ARCH_202402 2024-02-01-12-07-52-00               
 ```
 
 ### BTRFS Subvolumes
 
 To set up our btrfs subvolumes, we need to first mount our btrfs filesystem partition.
 
-```sh
-$ mount /dev/sda3 /mnt
+```
+root@archiso ~ # mount /dev/sda3 /mnt
 ```
 
-We can now create some btrfs subvolumes.
+You can verify that it successfully mounted by running `lsblk`.
 
-```sh
-$ cd /mnt
-$ btrfs subv create @           # /
-$ btrfs subv create @cache      # /var/cache
-$ btrfs subv create @home       # /home (if not on another disk)
-$ btrfs subv create @images     # /var/lib/libvirt/images
-$ btrfs subv create @var_log    # /var/log 
-$ btrfs subv create @snapshots  # /.snapshots
-$ umount /mnt
+```
+root@archiso ~ # lsblk
+NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+loop0    7:0    0 766.5M  1 loop /run/archiso/airootfs
+sda      8:0    0    32G  0 disk
+├─sda1   8:1    0     1G  0 part
+├─sda2   8:2    0     1G  0 part
+└─sda3   8:3    0    30G  0 part /mnt                       # Success!
+sr0     11:0    1 932.3M  0 rom  /run/archiso/bootmnt
+```
+
+We can now create some btrfs subvolumes. Remember that you can create and mount (or unmount and delete) subvolumes at any time.
+
+```
+root@archiso ~ # cd /mnt
+root@archiso /mnt # btrfs subv create @           # /
+root@archiso /mnt # btrfs subv create @cache      # /var/cache
+root@archiso /mnt # btrfs subv create @home       # /home (if not on another disk)
+root@archiso /mnt # btrfs subv create @images     # /var/lib/libvirt/images
+root@archiso /mnt # btrfs subv create @var_log    # /var/log 
+root@archiso /mnt # btrfs subv create @snapshots  # /.snapshots
+root@archiso /mnt # cd
+root@archiso ~ # umount /mnt
 ```
 
 Now that we have our subvolumes created, we can remount with the options that btrfs will expect.
 
-```sh
-# In this first example, @ is the subvolume we want to use
-# The @ subvolume is located on the /dev/sda3 filesystem
-# We want to mount it to /mnt, which will be / on the target system
-$ mount -o compress=zstd,noatime,subvol=@ /dev/sda3 /mnt
+In this first example, `@` is the subvolume that we want to use. The `@` subvolume is located in the filesystem on the `/dev/sda3` partition. We want to mount it to `/mnt`, which will be `/` (i.e., the root filesystem) on the target system.
 
-# Create the subdirectories for our other subvolumes
-$ mkdir -p /mnt/{boot/efi,home,.snapshots,var/{cache,log,lib/libvirt/images}}
+```
+root@archiso ~ # mount -o compress=zstd,noatime,subvol=@ /dev/sda3 /mnt
+```
 
-# Mount the rest of our subvolumes
-$ mount -o compress=zstd,noatime,subvol=@cache     /dev/sda3 /mnt/var/cache
-$ mount -o compress=zstd,noatime,subvol=@home      /dev/sda3 /mnt/home
-$ mount -o compress=zstd,noatime,subvol=@images    /dev/sda3 /mnt/lib/libvirt/images
-$ mount -o compress=zstd,noatime,subvol=@var_log   /dev/sda3 /mnt/var/log
-$ mount -o compress=zstd,noatime,subvol=@snapshots /dev/sda3 /mnt/.snapshots
+We need to create the subdirectories for our other subvolumes to mount.
+
+```
+root@archiso ~ # mkdir -p /mnt/{boot/efi,home,.snapshots,var/{cache,log,lib/libvirt/images}}
+```
+
+We can use `ls -la` to verify that directories -- including the hidden `.snapshots` directory -- were created. You can `ls` any of these subdirectories to confirm whether content exists within them.
+
+```
+root@archiso ~ # ls -la /mnt
+total 0
+drwxr-xr-x 1 root root  42 Feb  7 21:52 .
+drwxr-xr-x 1 root root 100 Feb  7 21:26 ..        
+drwxr-xr-x 1 root root   0 Feb  7 21:52 .snapshots
+drwxr-xr-x 1 root root   6 Feb  7 21:52 boot      
+drwxr-xr-x 1 root root   0 Feb  7 21:52 home      
+drwxr-xr-x 1 root root  22 Feb  7 21:52 var 
+```
+
+With those directories created, we can mount the rest of our subvolumes.
+
+```
+root@archiso ~ # mount -o compress=zstd,noatime,subvol=@cache     /dev/sda3 /mnt/var/cache
+root@archiso ~ # mount -o compress=zstd,noatime,subvol=@home      /dev/sda3 /mnt/home
+root@archiso ~ # mount -o compress=zstd,noatime,subvol=@images    /dev/sda3 /mnt/var/lib/libvirt/images
+root@archiso ~ # mount -o compress=zstd,noatime,subvol=@var_log   /dev/sda3 /mnt/var/log
+root@archiso ~ # mount -o compress=zstd,noatime,subvol=@snapshots /dev/sda3 /mnt/.snapshots
 ```
 
 We can mount our EFI partition.
 
-```sh
-$ mount /dev/sda1 /mnt/boot/efi
+```
+root@archiso ~ # mount /dev/sda1 /mnt/boot/efi
 ```
 
-## Pacstrap
+We can use `lsblk` to verify that everything so far has been mounted successfully.
 
-We'll use `pacstrap` to install the initial packages onto the target system.
-
-```sh
-$ pacstrap -K /mnt base base-devel git vim reflector openssh
+```
+root@archiso ~ # lsblk
+NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+loop0    7:0    0 766.5M  1 loop /run/archiso/airootfs
+sda      8:0    0    32G  0 disk
+├─sda1   8:1    0     1G  0 part /mnt/boot/efi
+├─sda2   8:2    0     1G  0 part
+└─sda3   8:3    0    30G  0 part /mnt/.snapshots
+                                 /mnt/var/log
+                                 /mnt/var/lib/libvirt/images
+                                 /mnt/home
+                                 /mnt/var/cache
+                                 /mnt
+sr0     11:0    1 932.3M  0 rom  /run/archiso/bootmnt
 ```
 
-## Fstab
+### Preparing the Target System
+
+We need to use `pacstrap` to install the initial packages onto the target system. Remember that `/mnt` on the Live ISO will be the `/` (root filesystem) on the target machine.
+
+```
+root@archiso ~ # pacstrap -K /mnt base base-devel git vim reflector openssh rsync
+```
 
 We'll set up the `fstab` using `genfstab`. The `-U` option ensures that our `/etc/fstab` file on the target system will use UUIDs to refer to devices and partitions. The `-p` option is technically redundant.
 
 Make sure you're appending to the `fstab` file on the target system (i.e., `/mnt/etc/sfstab`).
 
-```sh
-$ genfstab -U -p /mnt >> /mnt/etc/fstab
+```
+root@archiso ~ # genfstab -U -p /mnt >> /mnt/etc/fstab
 ```
 
+<a href="#chroot-into-target-system"></a>
 ## Chroot into Target System
 
-Now we can `chroot` into the in-progress installation on the target system.
+Now we can `chroot` into the in-progress installation on the target system. Note that we're now working on the target system from within the Live ISO. Notice that the prompt has changed.
 
-```sh
-$ arch-chroot /mnt
+```
+root@archiso ~ # arch-chroot /mnt
+[root@archiso /]#
 ```
 
 Verify that the `fstab` generated correctly.
 
-```sh
-$ vim /etc/fstab
+```
+[root@archiso /]# vim /etc/fstab
 ```
 
-Before we install any packages using `pacman`, we can make the same tweaks we did in the Live ISO environment.
+You should see something like this:
 
 ```sh
-$ reflector --country US --latest 5 --sort rate --save /etc/pacman.d/mirrorlist
-$ pacman -Syy
+# <file system> <dir> <type> <options> <dump> <pass>
+# /dev/sda3
+UUID=2f26556a-ac61-4d4e-ad5f-22b5498589f9       /               btrfs           rw,noatime,compress=zstd:3,space_cache=v2,subvolid=256,subvol=/@        0 0
+
+# /dev/sda3
+UUID=2f26556a-ac61-4d4e-ad5f-22b5498589f9       /var/cache      btrfs           rw,noatime,compress=zstd:3,space_cache=v2,subvolid=257,subvol=/@cache   0 0
+
+# /dev/sda1
+UUID=9BD3-8A05          /boot/efi       vfat            rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro   0 2
+
+# /dev/sda3
+UUID=2f26556a-ac61-4d4e-ad5f-22b5498589f9       /home           btrfs           rw,noatime,compress=zstd:3,space_cache=v2,subvolid=258,subvol=/@home    0 0        
+
+# /dev/sda3
+UUID=2f26556a-ac61-4d4e-ad5f-22b5498589f9       /var/lib/libvirt/images btrfs           rw,noatime,compress=zstd:3,space_cache=v2,subvolid=259,subvol=/@images  0 0
+
+# /dev/sda3
+UUID=2f26556a-ac61-4d4e-ad5f-22b5498589f9       /var/log        btrfs           rw,noatime,compress=zstd:3,space_cache=v2,subvolid=260,subvol=/@var_log 0 0
+
+# /dev/sda3
+UUID=2f26556a-ac61-4d4e-ad5f-22b5498589f9       /.snapshots     btrfs           rw,noatime,compress=zstd:3,space_cache=v2,subvolid=261,subvol=/@snapshots       0 0
 ```
 
-```sh
-$ vim /etc/pacman.conf
+Before we install any packages using `pacman`, we can make the same tweaks we did in the Live ISO environment. This updates the `pacman` mirrorlist on the target system. Make sure you have `rsync` installed. If you didn't install `rsync` via `pacstrap`, you can do so via `pacman -S rsync`.
 
-# Enable ParallelDownloads and set a value > 1
-# Optionally enable Color
+```
+[root@archiso /]# reflector --countr US --latest 5 --sort rate --save /etc/pacman.d/mirrorlist
+```
 
-$ pacman -Syy
+```
+[root@archiso /]# vim /etc/pacman.conf
+
+# Misc options
+#UseSyslog
+Color
+#NoProgressBar
+CheckSpace
+#VerbosePkgLists
+ParallelDownloads = 10
+```
+
+Now we can sync the local `pacman` package database with the mirrors.
+
+```
+[root@archiso /]# pacman -Syy
+:: Synchronizing package databases...
 ```
 
 Now that we're on the target system, we can use `pacman` to install our preferred initial packages.
 
-```sh
-$ mkdir GitPackageLists
-$ cd GitPackageLists
-$ git clone <repository>/ArchLinux
-$ cd ArchLinux
+```
+[root@archiso /]# mkdir GitPackageLists
+[root@archiso /]# cd GitPackageLists
+[root@archiso /GitPackageLists]#  git clone <repository>/ArchLinux
+[root@archiso /GitPackageLists]#  cd ArchLinux
 
 # Install from our package lists
-$ pacman -S --needed - < 01-base.txt
-$ pacman -S --needed - < 02-kernel.txt
-$ pacman -S --needed - < 03-sysutils.txt
-$ pacman -S --needed - < 04-drivers.txt
-$ pacman -S --needed - < 05-network.txt
-$ pacman -S --needed - < 06-fonts.txt
-$ pacman -S --needed - < 07-printer.txt
-$ pacman -S --needed - < 08-multimedia.txt
-$ pacman -S --needed - < 09-xorg.txt
-$ pacman -S --needed - < 10-xfce.txt  # Note that Xfce4 is GTK
-$ pacman -S --needed - < 11-misc.txt  
+# Use the --needed flag so we don't reinstall anything
+[root@archiso ArchLinux]# pacman -S --needed - < 01-base.txt
+[root@archiso ArchLinux]# pacman -S --needed - < 02-kernel.txt
+[root@archiso ArchLinux]# pacman -S --needed - < 03-sysutils.txt
+[root@archiso ArchLinux]# pacman -S --needed - < 04-drivers.txt
+[root@archiso ArchLinux]# pacman -S --needed - < 05-network.txt
+[root@archiso ArchLinux]# pacman -S --needed - < 06-fonts.txt
+[root@archiso ArchLinux]# pacman -S --needed - < 07-printer.txt
+[root@archiso ArchLinux]# pacman -S --needed - < 08-multimedia.txt
+[root@archiso ArchLinux]# pacman -S --needed - < 09-xorg.txt
+[root@archiso ArchLinux]# pacman -S --needed - < 10-xfce.txt  # Note that Xfce4 is GTK
+[root@archiso ArchLinux]# pacman -S --needed - < 11-misc.txt  
 ```
 
-Now we can set a password for the `root` superuser.
+Now we can set a password for the `root` superuser. If you don't specify a user for `passwd`, it will default to the `root` superuser.
 
-```sh
-$ passwd
+```
+[root@archiso /]# passwd
 ```
 
-Now we can create a user for ourselves and give them a password.
+If you've installed `openssh`, now's a good time to starte the `sshd` daemon.
 
-```sh
-$ useradd -m -G sys,log,network,floppy,scanner,power,rfkill,users,video,audio,storage,optical,lp,wheel,adm -s /bin/zsh <name>
-$ passwd <name>
-$ id <name>  # Inspect a user
+```
+[root@archiso /]# systemctl enable sshd
+Created symlink /etc/systemd/system/multi-user.target.wants/sshd.service → /usr/lib/systemd/system/sshd.service.
+```
+
+Now we can create a user for ourselves and give them a password. This particular list of groups is probably overkill. Consult the Arch Wiki to see what's appropriate for you. In this case, we're specifying that this user will use the `zsh` shell (`-s /bin/zsh`).
+
+```
+[root@archiso /]# useradd -m -G sys,log,network,floppy,scanner,power,rfkill,users,video,audio,storage,optical,lp,wheel,adm -s /bin/zsh <name>
+[root@archiso /]# passwd <name>
+[root@archiso /]# id <name>  # Inspect a user
 ```
 
 We need to allow our user to execute commands via `sudo`. We can do this by editing the `sudoers` file.
 
-```sh
-$ EDITOR=vim visudo  # Uncomment the `%wheel ALL=(ALL:ALL) ALL` line
+```
+[root@archiso /]# EDITOR=vim visudo  
+
+## Uncomment to allow members of group wheel to execute any command
+%wheel ALL=(ALL:ALL) ALL
 ```
 
-If you've installed `openssh`, you can enable the service daemon now.
 
-```sh
-$ systemctl enable sshd
-```
 <!-- 
 ### Install Linux Kernels
 
@@ -310,217 +514,308 @@ $ pacman -S --needed libva-mesa-driver
 We can modify our GRUB default config. This is especially necessary if you're using an encrypted filesystem and/or LVM. You may also want to specify the root filesystem's path.
 
 ```sh
-$ vim /etc/default/grub
+[root@archiso /]# vim /etc/default/grub
 ```
 
 Look for `GRUB_CMDLINE_LINUX_DEFAULT` and `GRUB_CMDLINE_LINUX` near the top of the file.
 
 We need to create a place for our EFI partition to mount, if it doesn't already exist. Mount to that point, if not already mounted.
 
-```sh
-$ mkdir /boot/efi
-$ mount /dev/sda1 /boot/efi  # Use the correct device and partition
+```
+[root@archiso /]# mkdir /boot/efi
+[root@archiso /]# mount /dev/sda1 /boot/efi  # Use the correct device and partition
 ```
 
-We can install the GRUB bootloader.
+We'll install the GRUB bootloader.
 
-```sh
-$ grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=grub_uefi --recheck
+```
+[root@archiso /]# grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=grub_uefi --recheck
+Installing for x86_64-efi platform.
+Installation finished. No error reported.
 ```
 
-```sh
-$ cp /usr/share/locale/en\@quot\LC_MESSAGES/grub.mo /boot/grub/locale/en.mo
-$ grub-mkconfig -o /boot/grub/grub.cfg
-$ grub-mkconfig -o /boot/efi/EFI/arch/grub.cfg
+Optionally, set up the locale for GRUB.
+
+```
+[root@archiso /]# cp /usr/share/locale/en\@quot/LC_MESSAGES/grub.mo /boot/grub/locale/en.mo
+```
+
+Now we can generate the GRUB config file.
+
+```
+[root@archiso /]# grub-mkconfig -o /boot/grub/grub.cfg
+Generating grub configuration file ...
+Found linux image: /boot/vmlinuz-linux-lts
+Found initrd image: /boot/intel-ucode.img /boot/initramfs-linux-lts.img
+Found fallback initrd image(s) in /boot:  intel-ucode.img initramfs-linux-lts-fallback.img
+Found linux image: /boot/vmlinuz-linux
+Found initrd image: /boot/intel-ucode.img /boot/initramfs-linux.img
+Found fallback initrd image(s) in /boot:  intel-ucode.img initramfs-linux-fallback.img
+Warning: os-prober will not be executed to detect other bootable partitions.
+Systems on them will not be added to the GRUB boot configuration.
+Check GRUB_DISABLE_OS_PROBER documentation entry.
+Adding boot menu entry for UEFI Firmware Settings ...
+Found memtest86+ image: /boot/memtest86+/memtest.bin
+done
 ```
 
 ### `mkinitcpio`
 
-We can necessary values to our `mkinitcpio` config.
+We can add necessary values to our `mkinitcpio` config.
 
-```sh
-$ vim /etc/mkinitcpio.conf
+```
+[root@archiso /]# vim /etc/mkinitcpio.conf
 ```
 
-We're using `btrfs`, so we can add `btrfs` to the `MODULES` and `BINARIES` collections.
+We're using `btrfs`, so we can add `btrfs` to the `MODULES` and `BINARIES` collections. If you're using LVM, add `lvm2` to the `HOOKS`. Also make sure you `pacman -S lvm2`. 
 
-If you're using LVM, add `lvm2` to the `HOOKS`. Also make sure you `pacman -S lvm2`.
+Once we're finished updating `mkinitcpio.conf`, we need to rebuild our kernel image. Repeat this command for whichever kernels you installed.
 
-Once we're finished updating `mkinitcpio.conf`, we need to rebuild our kernel images.
-
-```sh
-$ mkinitcpio -p linux
-$ mkinitcpio -p linux-lts  # Only if you installed the LTS kernel
+```
+[root@archiso /]# mkinitcpio -p linux
+[root@archiso /]# mkinitcpio -p linux-lts  
 ```
 
 ### Time and Locale
 
-```sh
-$ ln -sf /usr/share/zoneinfo/America/Chicago /etc/localtime
-$ vim /etc/systemd/timesyncd.conf  # Set the NTP and FallbackNTP under [Time]
-$ systemctl enable systemd-timesyncd.service
-$ hwclock --systohc --utc
+```
+[root@archiso /]# ln -sf /usr/share/zoneinfo/US/Central /etc/localtime
+[root@archiso /]# hwclock --systohc --utc
 ```
 
-```sh
-$ vim /etc/locale.gen  # Uncomment #en_US.UTF-8
-$ locale-gen
-$ echo "LANG=en_US.UTF-8" > /etc/locale.conf
+We can use `timesyncd` to sync time via NTP for us.
+
+```
+[root@archiso /]# vim /etc/systemd/timesyncd.conf  # Set the NTP and FallbackNTP 
+[root@archiso /]# systemctl enable systemd-timesyncd.service
+Created symlink /etc/systemd/system/dbus-org.freedesktop.timesync1.service → /usr/lib/systemd/system/systemd-timesyncd.service.        
+Created symlink /etc/systemd/system/sysinit.target.wants/systemd-timesyncd.service → /usr/lib/systemd/system/systemd-timesyncd.service.
 ```
 
-```sh
-$ echo "<hostname>" > /etc/hostname
+```
+[root@archiso /]# vim /etc/locale.gen                           # Uncomment your UTF-8 locale and save
+[root@archiso /]# locale-gen
+Generating locales...
+  en_US.UTF-8... done
+Generation complete.
+[root@archiso /]# echo "LANG=en_US.UTF-8" > /etc/locale.conf    # Use your own locale
 ```
 
-```sh
-$ vim /etc/hosts
+Set your machine's hostname by writing to `/etc/hostname`.
 
-# Add the following entries to `/etc/hosts`
-# 127.0.0.1     localhost
-# ::1           localhost
-# 127.0.1.1     <hostname>.localdomain  <hostname>
+```
+[root@archiso /]# echo "<hostname>" > /etc/hostname
+```
+
+Set up the `/etc/hosts` file for the system. Substitute the same `hostname` you wrote to `/etc/hostname`.
+
+```
+[root@archiso /]# vim /etc/hosts
+
+# Static table lookup for hostnames.
+# See hosts(5) for details.
+127.0.0.1       localhost                   # IPv4
+::1             localhost                   # IPv6
+127.0.1.1       <hostname>.localdomain     <hostname>
 ```
 
 ### Enable System Services
 
 We can enable various service daemons that systemd will control.
 
-```sh
-$ systemctl enable sddm.service         # Enable the SDDM greeter
-$ systemctl enable NetworkManager       # Enable Network Manager
-$ systemctl enable avahi-daemon         # Detect devices on network
-$ systemctl enable bluetooth.service    # Bluetooth support
-$ systemctl enable haveged              # RNG for some services
-$ systemctl enable cups.service         # Printing
-$ systemctl enable firewalld.service    # Firewall
-$ systemctl enable fstrim.timer         # Filesystem trim timer
-$ systemctl enable reflector.timer      # `pacman` mirror updates
-$ systemctl enable sshd                 # SSH support
-$ systemctl enable upower               # Probably unnecessary
+```
+[root@archiso /]# systemctl enable sddm.service         # SDDM greeter
+[root@archiso /]# systemctl enable NetworkManager       # Network management
+[root@archiso /]# systemctl enable avahi-daemon         # Detect devices on network
+[root@archiso /]# systemctl enable bluetooth.service    # Bluetooth support
+[root@archiso /]# systemctl enable haveged              # RNG for some services
+[root@archiso /]# systemctl enable cups.service         # Printing support
+[root@archiso /]# systemctl enable firewalld.service    # Firewall daemon
+[root@archiso /]# systemctl enable fstrim.timer         # FS trim timer (good for SSDs)
+[root@archiso /]# systemctl enable reflector.timer      # `pacman` mirror updates
+[root@archiso /]# systemctl enable sshd                 # SSH support
+[root@archiso /]# systemctl enable upower               # Probably unnecessary
 ```
 
 ### Exit Chroot
 
 Once we're finished doing initial setup within the target system, we can `exit` the `chroot`.
 
-```sh
-$ exit
+```
+[root@archiso /]# exit
 ```
 
 We need to make sure that we unmount all the devices and partitions that we've mounted from inside the Live ISO.
 
-```sh
-$ umount -R /mnt
-$ lsblk     # Verify everything was unmounted
+```
+root@archiso ~ # umount -R /mnt
+root@archiso ~ # lsblk                      # Verify everything was unmounted
 ```
 
 Finally, we can `reboot` to restart the system.
 
-```sh
-$ reboot now
+```
+root@archiso ~ # reboot now
 ```
 
+You can remove your install medium at this point.
+
+<a href="#post-install-configuration"></a>
 ## Post-Install Configuration
 
 Now that we have Arch Linux installed, we can do some configuration on our actual system. 
 
-### `paru` AUR Helper
+### AUR Helper
 
-We'll use the `paru` AUR helper.
+We'll use the `paru` AUR helper. The `paru` AUR package will also prompt you to install Rust. Alternatively, you can get a precompiled version from the `paru-bin` package. If you don't want to use `paru`, you can use `yay`, which is written in Go.
+
+Clone `paru` from the AUR and make the package. This will take some time while `cargo` compiles the `paru` binary.
 
 ```sh
-# Install rust
-$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Install `paru`
-$ git clone https://aur.archlinux.org/paru.git
-$ cd paru
-$ makepkg -si
-
-# Make sure `paru` works
-$ paru
-
-# Cleanup
-$ cd
-$ rm -rf /paru
+beaver@archbox ~ % git clone https://aur.archlinux.org/paru.git
+beaver@archbox ~/paru % cd paru
+beaver@archbox ~/paru % makepkg -si
 ```
 
-### `snapper` for Snapshots
-
-We'll use `snapper` to manage our btrfs snapshots. We'll also install packages to automatically create pre-post snapshots for `pacman`/`paru` (`snap-pac`), as well as to show snapshots on the GRUB boot menu (`grub-btrfs`).
+Verify that `paru` works, and clean up whatever's left behind from the download and installation.
 
 ```sh
-$ paru -S snapper-support
+beaver@archbox ~/paru % paru
+beaver@archbox ~/paru % cd
+beaver@archbox ~ % rm -rf /paru
+```
+
+### Snapshots
+
+We'll use `snapper` to manage our btrfs snapshots. We'll also install packages to automatically create pre-post snapshots for `pacman`/`paru` (`snap-pac`), as well as to show snapshots on the GRUB boot menu (`grub-btrfs`). We can do all this with the convenient AUR package `snapper-support`.
+
+```sh
+beaver@archbox ~ % paru -S snapper-support
 ```
 
 `snapper` will try to create its own snapshots directory at `/.snapshots`, but we already have a subvolume set up there. We can fix that.
 
-```sh
-$ sudo -s   # Become root superuser
-$ cd /      
-$ umount /.snapshots
-$ rm -r /.snapshots
+```
+beaver@archbox ~ % sudo -s
+root@archbox /home/beaver # cd /
+root@archbox / # umount /.snapshots 
+root@archbox / # rm -r /.snapshots
+```
 
-# Create the "root" config with `snapper`, targeting the root filesystem
-$ snapper -c root create-config /
+Create the "root" config with `snapper`, targeting the root filesystem.
 
-# `snapper` will create a new `.snapshots` subvolume we need to delete
-$ btrfs subv list /
-$ btrfs subv delete /.snapshots
+```
+root@archbox / # snapper -c root create-config /
+```
 
-# Re-create the directory and re-mount on it
-$ mkdir /.snapshots
-$ mount -a
-$ lsblk
+`snapper` will create a new `.snapshots` subvolume that we need to delete.
+
+```
+root@archbox / # btrfs subv list /
+ID 256 gen 164 top level 5 path @
+ID 257 gen 162 top level 5 path @cache
+ID 258 gen 164 top level 5 path @home
+ID 259 gen 8 top level 5 path @images
+ID 260 gen 164 top level 5 path @var_log
+ID 261 gen 8 top level 5 path @snapshots
+ID 262 gen 12 top level 256 path var/lib/portables
+ID 263 gen 12 top level 256 path var/lib/machines
+ID 264 gen 164 top level 256 path .snapshots            # We want to delete this one
+root@archbox / # btrfs subv delete /.snapshots 
+Delete subvolume 264 (no-commit): '//.snapshots'
+```
+
+Now we can re-create the directory and re-mount it. We can re-mount it by leveraging our already existing `/etc/fstab`.
+
+```
+root@archbox / # mkdir /.snapshots
+root@archbox / # mount -a
 ```
 
 While we're here, we can set up the default subvolume for our root filesystem (`/`).
 
-```sh
-$ btrfs subv get-default /
-$ btrfs subv list /             # We're looking for the ID for @
-$ btrfs subv set-default <ID> /
-$ btrfs subv get-default /      # Verify
+```
+root@archbox / # btrfs subv get-default /
+ID 5 (FS_TREE)
+root@archbox / # btrfs subv list /
+ID 256 gen 166 top level 5 path @                       # We want ID 256 for @
+ID 257 gen 162 top level 5 path @cache
+ID 258 gen 164 top level 5 path @home
+ID 259 gen 8 top level 5 path @images
+ID 260 gen 166 top level 5 path @var_log
+ID 261 gen 8 top level 5 path @snapshots
+ID 262 gen 12 top level 256 path var/lib/portables
+ID 263 gen 12 top level 256 path var/lib/machines
+root@archbox / # btrfs subv set-default 256 /
+root@archbox / # btrfs subv get-default /    
+ID 256 gen 167 top level 5 path @                       # Success!
 ```
 
 We can allow our user(s) to see and access the `snapper` snapshots directory by editing the appropriate configuration file.
 
-```sh
-$ vim /etc/snapper/config/root      # For the "root" config
+```
+root@archbox / # vim /etc/snapper/config/root      # For the "root" config we created
 
-# Add the user to `ALLOW_USERS`
-# Add the "wheel" group to `ALLOW_GROUPS`
-# Adjust `TIMELINE` values as desired
-
-# Update permissions for the `/.snapshots` directory
-$ chmod a+rx .snapshots
-$ chown -R :wheel .snapshots
+# users and groups allowed to work with config
+ALLOW_USERS="beaver"
+ALLOW_GROUPS="wheel"
 ```
 
-We can create a snapshot of our current system configuration. Remember that snapshots are read-only by default.
+Adjust `TIMELINE` values as desired.
 
-```sh
-$ snapper -c root create -d "***** SYSTEM INSTALL *****"
+We also need to update the permissions for `/.snapshots`.
+
+```
+root@archbox / # chmod a+rx .snapshots
+root@archbox / # chown -R :wheel .snapshots
 ```
 
-We can verify that the `grub-btrfs` service was enabled and started.
+We can enable `snapper`'s built-in timer service.
 
-```sh
-$ systemctl status grub-btrfsd
-$ systemctl status grub-btrfs-snapper.service
+```
+root@archbox / # systemctl status snapper-timeline.timer
+```
+
+We can verify that the `grub-btrfs` service was enabled and started. We also want to update our GRUB config to ensure our snapshots are available at the boot menu.
+
+```
+root@archbox / # systemctl enable --now grub-btrfsd.service
+root@archbox / # systemctl start --now grub-btrfs-snapper.service
+root@archbox / # grub-mkconfig -o /boot/grub/grub.cfg
+root@archbox / # systemctl daemon-reload
+```
+
+We can create a snapshot of our current system configuration. Remember that snapshots are read-only by default. We re-make our GRUB config to ensure that our manual snapshots are also available.
+
+```
+root@archbox / # snapper -c root create -d "***** SYSTEM INSTALL *****"
+root@archbox / # grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+We can verify that our snapshot was created by checking `snapper ls`.
+
+```
+root@archbox / # snapper ls
+ # | Type   | Pre # | Date                            | User | Cleanup | Description                | Userdata
+---+--------+-------+---------------------------------+------+---------+----------------------------+---------
+0  | single |       |                                 | root |         | current                    |
+1  | single |       | Wed 07 Feb 2024 05:57:56 PM CST | root |         | ***** SYSTEM INSTALL ***** |
 ```
 
 Exit root whenever you're ready.
 
-### `zram` for RAM-based Swap
+### RAM-based Swap
 
 We can use `zram` to use our RAM for swap space, instead of using precious read/write cycles on our SSD.
 
-```sh
-$ paru -S zram-generator        # `snap-pac` should do a pre/post snapshot
+```
+beaver@archbox ~ % paru -S zram-generator
+```
 
-# Configure `zram-generator`
-$ sudo vim /etc/systemd/zram-generator.conf
+We need to configure `zram-generator`.
+
+```
+beaver@archbox ~ % sudo vim /etc/systemd/zram-generator.conf 
 ```
 
 We can configure `zram-generator` like so:
@@ -532,18 +827,22 @@ zram-size = ram / 2
 
 Now we need to reload our system daemons.
 
-```sh
-$ sudo systemctl daemon-reload
-$ sudo systemctl start /dev/zram0
+```
+beaver@archbox ~ % sudo systemctl daemon-reload 
+beaver@archbox ~ % sudo systemctl start /dev/zram0
 ```
 
-We can check `zram` by using `zramctl`. May require a reboot for `zram` to take effect.
+We can check `zram` by using `zramctl`. You may need to reboot for `zram` to take effect.
 
-```sh
-$ zramctl
-$ free -h       # Should show swap is active
+```
+beaver@archbox ~ % zramctl
+beaver@archbox ~ % free -h
+               total        used        free      shared  buff/cache   available
+Mem:           3.8Gi       998Mi       2.1Gi       6.4Mi       989Mi       2.8Gi
+Swap:          1.9Gi          0B       1.9Gi
 ```
 
+<a href="#additional-resources"></a>
 ## Additional Resources
 
 <!--
