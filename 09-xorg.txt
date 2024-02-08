@@ -1,4 +1,7 @@
+grobi
 xorg-server
+xorg-xev
+xorg-xeyes
 xorg-xinit
 xorg-xkill
 xorg-xwayland

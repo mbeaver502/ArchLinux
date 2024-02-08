@@ -4,6 +4,8 @@ dosfstools
 efibootmgr
 git
 grub
+lvm2
+mdadm
 mtools
 networkmanager
 openssh

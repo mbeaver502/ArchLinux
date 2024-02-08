@@ -3,7 +3,6 @@ haveged
 intel-media-driver
 libva-mesa-driver
 libva-utils
-linux-headers
 mesa
 mesa-vdpau
 virtualbox-guest-utils

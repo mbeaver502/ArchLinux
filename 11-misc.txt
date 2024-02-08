@@ -16,7 +16,5 @@ neofetch
 pacman-contrib
 parallel
 qbittorrent
-qt5-wayland
-qt6-wayland
 vlc
 yt-dlp
