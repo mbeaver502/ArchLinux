@@ -1,6 +1,7 @@
 alsa-card-profiles
 alsa-plugins
 alsa-firmware
+ffmpegthumbs
 gst-libav
 gst-plugin-pipewire
 gst-plugins-base
@@ -10,10 +11,17 @@ gst-plugins-ugly
 gstreamer
 gstreamer-vaapi
 helvum
+pamixer
+pavucontrol
 pipewire
 pipewire-alsa
+pipewire-audio
 pipewire-jack
 pipewire-pulse
+pipewire-zeroconf
+qt5-imageformats
+slurp
+swappy
 wireplumber
 x264
 x265

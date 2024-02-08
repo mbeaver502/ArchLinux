@@ -10,7 +10,9 @@ This process is mostly cobbled together from the [Arch Wiki](https://wiki.archli
 2. [Disks](#disks)
 3. [Chroot into Target System](#chroot-into-target-system)
 4. [Post-Install Configuration](#post-install-configuration)
-5. [Additional Resources](#additional-resources)
+5. [Tiling Window Manager](#tiling-window-manager)
+6. [Hyprland](#hyprland)
+7. [Additional Resources](#additional-resources)
 
 <a href="#first-steps"></a>
 ## First Steps
@@ -249,6 +251,15 @@ sr0     11:0    1 932.3M  0 rom  /run/archiso/bootmnt
 ```
 
 We can now create some btrfs subvolumes. Remember that you can create and mount (or unmount and delete) subvolumes at any time.
+
+The Arch Wiki offers the following tips:
+
+
+> - When taking a snapshot of `@` (mounted at the root `/`), other subvolumes are not included in the snapshot. Even if a subvolume is nested below `@`, a snapshot of `@` will not include it. Create snapper configurations for additional subvolumes besides `@` of which you want to keep snapshots.
+> - Consider creating subvolumes for other directories that contain data you do not want to include in snapshots and rollbacks of the `@` subvolume, such as `/var/cache`, `/var/spool`, `/var/tmp`, `/var/lib/machines` (systemd-nspawn), `/var/lib/docker` (Docker), `/var/lib/postgres` (PostgreSQL), and other data directories under `/var/lib/`. It is up to you if you want to follow the flat layout or create nested subvolumes. On the other hand, the pacman database in `/var/lib/pacman` must stay on the root subvolume (`@`).
+> - You can run Snapper on @home and any other subvolume to have separate snapshot and rollback capabilities for data.
+
+If you do create subvolumes for directories under `/var/lib`, do *NOT* make a subvolume for `/var/lib/pacman`.
 
 ```
 root@archiso ~ # cd /mnt
@@ -761,7 +772,16 @@ ALLOW_USERS="beaver"
 ALLOW_GROUPS="wheel"
 ```
 
-Adjust `TIMELINE` values as desired.
+Adjust `TIMELINE` values as desired. The [Archi Wiki](https://wiki.archlinux.org/title/Snapper#Set_snapshot_limits) recommends the following defaults for busy subvolumes like `/`:
+
+```sh
+TIMELINE_MIN_AGE="1800"
+TIMELINE_LIMIT_HOURLY="5"     
+TIMELINE_LIMIT_DAILY="7"     
+TIMELINE_LIMIT_WEEKLY="0"    
+TIMELINE_LIMIT_MONTHLY="0"
+TIMELINE_LIMIT_YEARLY="0"
+```
 
 We also need to update the permissions for `/.snapshots`.
 
@@ -842,36 +862,38 @@ Mem:           3.8Gi       998Mi       2.1Gi       6.4Mi       989Mi       2.8Gi
 Swap:          1.9Gi          0B       1.9Gi
 ```
 
+TODO: Install btrfs-assistant https://aur.archlinux.org/packages/btrfs-assistant
+
+<a href="#tiling-window-manager"></a>
+## Tiling Window Manager
+
+TODO
+
+Currently the package lists are installing `awesomewm` and `qtile`. You can switch between them at the `sddm` greeting screen (or whichever greeter you're using).
+
+<a href="#hyprland"></a>
+## Hyprland
+
+TODO
+
+Additional dependencies for [hyprdots](https://github.com/prasanthrangan/hyprdots) that can be found in the AUR:
+- grimblast
+- oh-my-zsh
+- rofi-lbonn-wayland
+- swaylock-effects
+- swww
+- waybar-hyprland
+- wlogout
+- zsh-theme-powerlevel10k
+
+
 <a href="#additional-resources"></a>
 ## Additional Resources
 
+- [Arch Wiki page on `snapper`](https://wiki.archlinux.org/title/Snapper)
+- [Arch Wiki page on AMD GPUs](https://wiki.archlinux.org/title/AMDGPU)
+
 <!--
 https://wiki.archlinux.org/title/Installation_guide
-https://wiki.archlinux.org/title/Official_repositories#multilib
-https://wiki.archlinux.org/title/Users_and_groups#Group_list
-https://wiki.archlinux.org/title/Snapper
-https://wiki.archlinux.org/title/Firewalld
-https://wiki.archlinux.org/title/PipeWire
-https://wiki.archlinux.org/title/AMDGPU#Installation
-https://wiki.archlinux.org/title/Zram#Using_zram-generator
-
-https://archlinux.org/packages/extra/x86_64/inotify-tools/
-
-https://www.youtube.com/watch?v=MB-cMq8QZh4 
-https://www.youtube.com/watch?v=NOCPVxZhMqQ
-https://www.youtube.com/watch?v=FxeriGuJKTM
-https://github.com/stephenstechtalks/ArchLinux/tree/main/Paclists/230131-Xfce
 https://www.reddit.com/r/archlinux/comments/108hzb2/help_needed_with_btrfs_layout/
-
-https://archlinux.org/packages/extra/x86_64/helix/
-https://aur.archlinux.org/packages/btrfs-assistant
-https://github.com/sharkdp/bat?tab=readme-ov-file
-https://github.com/eza-community/eza?tab=readme-ov-file
-https://github.com/muesli/duf
-
-https://github.com/ohmyzsh/ohmyzsh
-https://github.com/romkatv/powerlevel10k?tab=readme-ov-file#oh-my-zsh
-
-https://wiki.hyprland.org/Getting-Started/Master-Tutorial/
-https://wiki.hyprland.org/Useful-Utilities/
 -->

@@ -1,4 +1,7 @@
 avahi
+bluez
+bluez-utils
+blueman
 dnsutils
 firewalld
 net-tools

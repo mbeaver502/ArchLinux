@@ -31,6 +31,7 @@ grml-zsh-config
 grub
 hdparm
 hyperv
+inotify-tools
 intel-ucode
 irssi
 iw
