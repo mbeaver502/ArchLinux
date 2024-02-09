@@ -434,7 +434,7 @@ Now that we're on the target system, we can use `pacman` to install our preferre
 ```
 [root@archiso /]# mkdir GitPackageLists
 [root@archiso /]# cd GitPackageLists
-[root@archiso /GitPackageLists]# git clone <repository>/ArchLinux
+[root@archiso /GitPackageLists]# git clone https://github.com/mbeaver502/ArchLinux
 [root@archiso /GitPackageLists]# cd ArchLinux
 
 # Install from our package lists
