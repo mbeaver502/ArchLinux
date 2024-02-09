@@ -2,7 +2,7 @@ accountsservice
 alacarte
 arc-gtk-theme
 arc-icon-theme
-awesomewm
+awesome
 blueman
 brightnessctl
 catfish
@@ -19,7 +19,6 @@ nwg-look
 papirus-icon-theme
 pavucontrol
 polkit-kde-agent
-qt4ct
 qt5ct
 qt5-wayland
 qt5-quickcontrols
