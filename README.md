@@ -1,4 +1,4 @@
-# Arch Linux Install
+# Arch Linux Install 
 
 This is the process I followed to set up my personal Arch Linux installation. Your mileage may vary. When in doubt, consult the official Arch Wiki and related documentation. 
 
