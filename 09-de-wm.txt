@@ -10,6 +10,7 @@ cliphist
 galculator
 geany
 gnome-firmware
+grobi
 hyprland
 kde-cli-tools
 kvantum
@@ -18,6 +19,7 @@ meld
 nwg-look
 papirus-icon-theme
 pavucontrol
+picom
 polkit-kde-agent
 qt5ct
 qt5-wayland
@@ -36,3 +38,11 @@ xdg-desktop-portal-wlr
 xdg-utils
 xfce4
 xfce4-goodies
+xorg-server
+xorg-xev
+xorg-xeyes
+xorg-xinit
+xorg-xkill
+xorg-xwayland
+xterm
+xwaylandvideobridge
