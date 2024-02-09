@@ -4,6 +4,8 @@ This is the process I followed to set up my personal Arch Linux installation. Yo
 
 This process is mostly cobbled together from the [Arch Wiki](https://wiki.archlinux.org/title/Installation_guide), [Stephen's Tech Talks](https://www.youtube.com/@stephenstechtalks5377), [Learn Linux TV](https://www.youtube.com/@LearnLinuxTV), and [Dreams of Autonomy](https://www.youtube.com/@dreamsofautonomy). I owe a debt of gratitude to them all.
 
+If you're going to use the package lists here, I highly recommend going through and removing whatever you don't need. For example, the fonts package list has about 3GB worth of files to download. You may want to skip that one altogether, if only to speed things along. You can always go back to the Arch repositories and the AUR to get what you need post-installation. 
+
 # Contents
 
 1. [First Steps](#first-steps)
@@ -273,13 +275,13 @@ Now that we have our subvolumes created, we can remount with the options that bt
 In this first example, `@` is the subvolume that we want to use. The `@` subvolume is located in the filesystem on the `/dev/sda2` partition. We want to mount it to `/mnt`, which will be `/` (i.e., the root filesystem) on the target system.
 
 ```
-root@archiso ~ # mount -o compress=zstd,noatime,subvol=@ /dev/sdas /mnt
+root@archiso ~ # mount -o compress=zstd,noatime,subvol=@ /dev/sda2 /mnt
 ```
 
 We need to create the subdirectories for our other subvolumes to mount.
 
 ```
-root@archiso / # mkdir -p /mnt/{boot/efi,home/.snapshots,.snapshots,var/{cache,log,tmp,lib/libvirt/images}}
+root@archiso / # mkdir -p /mnt/{boot/efi,home/{.snapshots},.snapshots,var/{cache,log,tmp,lib/libvirt/images}}
 ```
 
 We can use `ls -la` to verify that directories -- including the hidden `.snapshots` directory -- were created. You can `ls` any of these subdirectories to confirm whether content exists within them.
@@ -304,7 +306,7 @@ root@archiso / # mount -o compress=zstd,noatime,subvol=@var_log /dev/sda2 /mnt/v
 root@archiso / # mount -o compress=zstd,noatime,subvol=@var_tmp /dev/sda2 /mnt/var/tmp
 root@archiso / # mount -o compress=zstd,noatime,subvol=@snapshots /dev/sda2 /mnt/.snapshots
 root@archiso / # mount -o compress=zstd,noatime,subvol=@home /dev/sdb1 /mnt/home
-root@archiso / # mount -o compress=zstd,noatime,subvol=@home /dev/sdb1 /mnt/home/.snapshots
+root@archiso / # mount -o compress=zstd,noatime,subvol=@snapshots /dev/sdb1 /mnt/home/.snapshots
 ```
 
 We can mount our EFI partition.
@@ -445,9 +447,8 @@ Now that we're on the target system, we can use `pacman` to install our preferre
 [root@archiso ArchLinux]# pacman -S --needed - < 06-fonts.txt
 [root@archiso ArchLinux]# pacman -S --needed - < 07-printer.txt
 [root@archiso ArchLinux]# pacman -S --needed - < 08-multimedia.txt
-[root@archiso ArchLinux]# pacman -S --needed - < 09-xorg.txt
-[root@archiso ArchLinux]# pacman -S --needed - < 10-de-wm.txt
-[root@archiso ArchLinux]# pacman -S --needed - < 11-misc.txt  
+[root@archiso ArchLinux]# pacman -S --needed - < 09-de-wm.txt
+[root@archiso ArchLinux]# pacman -S --needed - < 10-misc.txt  
 ```
 
 Now we can set a password for the `root` superuser. If you don't specify a user for `passwd`, it will default to the `root` superuser.
@@ -810,6 +811,12 @@ root@archbox / # snapper ls
 
 Exit root whenever you're ready.
 
+If you want a nice GUI frontend for managing your `snapper` setup, you can install [`btrfs-assistant`](https://aur.archlinux.org/packages/btrfs-assistant).
+
+```sh
+beaver@archbox ~ % paru -S btrfs-assistant
+```
+
 ### RAM-based Swap
 
 We can use `zram` to use our RAM for swap space, instead of using precious read/write cycles on our SSD.
@@ -848,23 +855,17 @@ Mem:           3.8Gi       998Mi       2.1Gi       6.4Mi       989Mi       2.8Gi
 Swap:          1.9Gi          0B       1.9Gi
 ```
 
-TODO: Install btrfs-assistant https://aur.archlinux.org/packages/btrfs-assistant
-
 <a href="#tiling-window-manager"></a>
 ## Tiling Window Manager
 
-TODO
-
-Currently the package lists are installing `awesome` and `qtile`. You can switch between them at the `sddm` greeting screen (or whichever greeter you're using). The Wayland version `qtile` appears to be broken, loading into a black screen. Could be a VM-specific problem. The Xorg version of `qtile` loads fine.
+Currently the package lists are installing `awesome` and `qtile`. You can switch between them at the `sddm` greeting screen (or whichever greeter you're using). The Wayland version `qtile` appears to be broken inside VirtualBox, loading into a black screen. Could be a VM-specific problem. The Xorg version of `qtile` loads fine.
 
 <a href="#hyprland"></a>
 ## Hyprland
 
-TODO
-
 Note that officially Hyprland does not work inside a VM.
 
-Additional dependencies for [hyprdots](https://github.com/prasanthrangan/hyprdots) that can be found in the AUR:
+If you're feeling lazy, install [hyprdots](https://github.com/prasanthrangan/hyprdots). Additional dependencies for  that can be found in the AUR:
 - grimblast
 - oh-my-zsh
 - rofi-lbonn-wayland
