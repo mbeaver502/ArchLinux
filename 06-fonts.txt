@@ -1,5 +1,6 @@
 inter-font
 noto-fonts
+noto-fonts-cjk
 ttf-bitstream-vera
 ttf-caladea
 ttf-carlito
@@ -33,6 +34,7 @@ ttf-opensans
 ttf-roboto
 ttf-roboto-mono
 ttf-roboto-mono-nerd
+ttf-sarasa-gothic
 ttf-terminus-nerd
 ttf-ubuntu-font-family
 ttf-ubuntu-mono-nerd
