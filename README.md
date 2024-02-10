@@ -6,6 +6,8 @@ This process is mostly cobbled together from the [Arch Wiki](https://wiki.archli
 
 If you're going to use the package lists here, I highly recommend going through and removing whatever you don't need. For example, the fonts package list has about 3GB worth of files to download. You may want to skip that one altogether, if only to speed things along. You can always go back to the Arch repositories and the AUR to get what you need post-installation. 
 
+As always, practice installation and configuration in a virtual environment (e.g., VirtualBox) before trying on actual hardware.
+
 # Contents
 
 1. [First Steps](#first-steps)
@@ -250,7 +252,7 @@ The Arch Wiki offers the following tips:
 > - Consider creating subvolumes for other directories that contain data you do not want to include in snapshots and rollbacks of the `@` subvolume, such as `/var/cache`, `/var/spool`, `/var/tmp`, `/var/lib/machines` (systemd-nspawn), `/var/lib/docker` (Docker), `/var/lib/postgres` (PostgreSQL), and other data directories under `/var/lib/`. It is up to you if you want to follow the flat layout or create nested subvolumes. On the other hand, the pacman database in `/var/lib/pacman` must stay on the root subvolume (`@`).
 > - You can run Snapper on @home and any other subvolume to have separate snapshot and rollback capabilities for data.
 
-If you do create subvolumes for directories under `/var/lib`, do *NOT* make a subvolume for `/var/lib/pacman`.
+If you do create subvolumes for directories under `/var/lib`, do *NOT* make a subvolume for `/var/lib/pacman`. It's important that the `pacman` directory stays in sync with whatever snapshot we're rolling back to (or from). If `pacman` gets out of sync, that could severely diminish your ability to effectively maintain installed packages.
 
 ```
 root@archiso / # cd /mnt
@@ -858,14 +860,14 @@ Swap:          1.9Gi          0B       1.9Gi
 <a href="#tiling-window-manager"></a>
 ## Tiling Window Manager
 
-Currently the package lists are installing `awesome` and `qtile`. You can switch between them at the `sddm` greeting screen (or whichever greeter you're using). The Wayland version `qtile` appears to be broken inside VirtualBox, loading into a black screen. Could be a VM-specific problem. The Xorg version of `qtile` loads fine.
+Currently the package lists are installing `awesome` and `qtile`. You can switch between them at the `sddm` greeting screen (or whichever greeter you're using). The Wayland version of `qtile` appears to be broken inside VirtualBox, loading into a black screen. Could be a VM-specific problem. The Xorg version of `qtile` loads fine.
 
 <a href="#hyprland"></a>
 ## Hyprland
 
 Note that officially Hyprland does not work inside a VM.
 
-If you're feeling lazy, install [hyprdots](https://github.com/prasanthrangan/hyprdots). Additional dependencies for  that can be found in the AUR:
+If you're feeling lazy, install [hyprdots](https://github.com/prasanthrangan/hyprdots). Additional dependencies for hyprdots that can be found in the AUR:
 - grimblast
 - oh-my-zsh
 - rofi-lbonn-wayland
