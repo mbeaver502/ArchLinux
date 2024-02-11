@@ -250,7 +250,7 @@ The Arch Wiki offers the following tips:
 
 > - When taking a snapshot of `@` (mounted at the root `/`), other subvolumes are not included in the snapshot. Even if a subvolume is nested below `@`, a snapshot of `@` will not include it. Create snapper configurations for additional subvolumes besides `@` of which you want to keep snapshots.
 > - Consider creating subvolumes for other directories that contain data you do not want to include in snapshots and rollbacks of the `@` subvolume, such as `/var/cache`, `/var/spool`, `/var/tmp`, `/var/lib/machines` (systemd-nspawn), `/var/lib/docker` (Docker), `/var/lib/postgres` (PostgreSQL), and other data directories under `/var/lib/`. It is up to you if you want to follow the flat layout or create nested subvolumes. On the other hand, the pacman database in `/var/lib/pacman` must stay on the root subvolume (`@`).
-> - You can run Snapper on @home and any other subvolume to have separate snapshot and rollback capabilities for data.
+> - You can run Snapper on `@home` and any other subvolume to have separate snapshot and rollback capabilities for data.
 
 If you do create subvolumes for directories under `/var/lib`, do *NOT* make a subvolume for `/var/lib/pacman`. It's important that the `pacman` directory stays in sync with whatever snapshot we're rolling back to (or from). If `pacman` gets out of sync, that could severely diminish your ability to effectively maintain installed packages.
 
